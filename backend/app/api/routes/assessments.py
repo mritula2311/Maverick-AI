@@ -2,13 +2,144 @@ import json
 import random
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.assessment import Assessment, Submission
+from app.core.llm_client import OllamaClient
 
 router = APIRouter(tags=["Assessments"])
+
+
+class AiGenerateRequest(BaseModel):
+    topic: str
+    assessment_type: Optional[str] = "quiz"
+    max_score: Optional[int] = 100
+    passing_score: Optional[int] = 60
+    time_limit_minutes: Optional[int] = 15
+
+
+@router.post("/ai-generate")
+def ai_generate_assessment(payload: AiGenerateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Use LLM to generate a new assessment (quiz/code/assignment) on a given topic."""
+    llm = OllamaClient()
+
+    if payload.assessment_type == "quiz":
+        prompt = f"""Generate a quiz on the topic: "{payload.topic}".
+Create exactly 5 multiple-choice questions. Return ONLY a JSON array where each element has:
+- "question": the question text
+- "options": array of 4 option strings
+- "correct_answer": index (0-3) of the correct option
+- "explanation": brief explanation of the answer
+
+Return ONLY the JSON array, no markdown, no extra text. Start with [ and end with ]."""
+    elif payload.assessment_type == "code":
+        prompt = f"""Generate a coding challenge on the topic: "{payload.topic}".
+Return ONLY a JSON object with:
+- "title": challenge title
+- "description": detailed problem description (2-3 paragraphs)
+- "starter_code": starter code template in Python
+- "test_cases": array of objects with "input", "expected_output", "description"
+- "language": "python"
+
+Return ONLY the JSON object. Start with {{ and end with }}."""
+    else:
+        prompt = f"""Generate a written assignment on the topic: "{payload.topic}".
+Return ONLY a JSON object with:
+- "title": assignment title
+- "description": detailed instructions (2-3 paragraphs)
+- "rubric": array of objects with "criterion", "weight", "description"
+
+Return ONLY the JSON object. Start with {{ and end with }}."""
+
+    try:
+        response = llm.generate(prompt, system="You are an expert assessment creator. Return only valid JSON, no markdown.")
+        cleaned = response.strip()
+        if "```" in cleaned:
+            import re
+            match = re.search(r"```(?:json)?\s*([\[\{].*?[\]\}])\s*```", cleaned, re.DOTALL)
+            if match:
+                cleaned = match.group(1)
+        if cleaned.startswith("["):
+            start = cleaned.find("[")
+            end = cleaned.rfind("]") + 1
+            cleaned = cleaned[start:end]
+        elif cleaned.startswith("{"):
+            start = cleaned.find("{")
+            end = cleaned.rfind("}") + 1
+            cleaned = cleaned[start:end]
+
+        generated = json.loads(cleaned)
+    except Exception as e:
+        print(f"[AI-Generate] LLM error: {e}")
+        # Fallback: create a simple default assessment
+        if payload.assessment_type == "quiz":
+            generated = [
+                {"question": f"What is a key concept in {payload.topic}?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct_answer": 0, "explanation": "This is a fundamental concept."},
+                {"question": f"Which best describes {payload.topic}?", "options": ["Definition A", "Definition B", "Definition C", "Definition D"], "correct_answer": 1, "explanation": "Based on standard definitions."},
+                {"question": f"What is an advantage of {payload.topic}?", "options": ["Speed", "Simplicity", "Scalability", "All of the above"], "correct_answer": 3, "explanation": "Multiple benefits apply."},
+                {"question": f"In {payload.topic}, what is most important?", "options": ["Accuracy", "Performance", "Readability", "Depends on context"], "correct_answer": 3, "explanation": "Context matters."},
+                {"question": f"How would you apply {payload.topic} in practice?", "options": ["Approach A", "Approach B", "Approach C", "Approach D"], "correct_answer": 0, "explanation": "Standard practical approach."},
+            ]
+        else:
+            generated = {"title": f"{payload.topic} Assessment", "description": f"Complete this assessment on {payload.topic}.", "rubric": []}
+
+    # Create Assessment in DB
+    title = f"{payload.topic} - AI Generated {payload.assessment_type.title()}"
+    if payload.assessment_type == "quiz":
+        questions_json = json.dumps(generated)
+        assessment = Assessment(
+            title=title,
+            description=f"AI-generated {payload.assessment_type} on {payload.topic}",
+            assessment_type=payload.assessment_type,
+            time_limit_minutes=payload.time_limit_minutes,
+            max_score=payload.max_score,
+            passing_score=payload.passing_score,
+            questions=questions_json,
+            is_active=True,
+            is_published=True,
+        )
+    elif payload.assessment_type == "code":
+        assessment = Assessment(
+            title=generated.get("title", title),
+            description=generated.get("description", f"Coding challenge on {payload.topic}"),
+            assessment_type="code",
+            time_limit_minutes=payload.time_limit_minutes,
+            max_score=payload.max_score,
+            passing_score=payload.passing_score,
+            starter_code=generated.get("starter_code", ""),
+            test_cases=json.dumps(generated.get("test_cases", [])),
+            language=generated.get("language", "python"),
+            is_active=True,
+            is_published=True,
+        )
+    else:
+        assessment = Assessment(
+            title=generated.get("title", title),
+            description=generated.get("description", f"Assignment on {payload.topic}"),
+            assessment_type="assignment",
+            time_limit_minutes=payload.time_limit_minutes,
+            max_score=payload.max_score,
+            passing_score=payload.passing_score,
+            rubric=json.dumps(generated.get("rubric", [])),
+            is_active=True,
+            is_published=True,
+        )
+
+    db.add(assessment)
+    db.commit()
+    db.refresh(assessment)
+
+    return {
+        "id": assessment.id,
+        "title": assessment.title,
+        "assessment_type": assessment.assessment_type,
+        "message": "Assessment created successfully",
+        "generated": generated,
+    }
 
 
 @router.get("/")

@@ -59,6 +59,64 @@ class OllamaClient:
     def _mock_response(self, prompt: str) -> str:
         prompt_lower = prompt.lower()
 
+        if "generate a quiz" in prompt_lower or "multiple-choice questions" in prompt_lower:
+            return json.dumps([
+                {
+                    "question": "What does the topic primarily focus on?",
+                    "options": ["Concept A", "Concept B", "Concept C", "Concept D"],
+                    "correct_answer": 0,
+                    "explanation": "A core concept is intentionally highlighted in the assessment prompt."
+                },
+                {
+                    "question": "Which option best describes the purpose of the topic?",
+                    "options": ["Definition A", "Definition B", "Definition C", "Definition D"],
+                    "correct_answer": 1,
+                    "explanation": "The topic is framed around practical understanding and application."
+                },
+                {
+                    "question": "What is one benefit of applying this topic in practice?",
+                    "options": ["Speed", "Clarity", "Scalability", "All of the above"],
+                    "correct_answer": 3,
+                    "explanation": "The topic supports multiple benefits in real-world use."
+                },
+                {
+                    "question": "Which statement is most accurate about the topic?",
+                    "options": ["Option A", "Option B", "Option C", "Option D"],
+                    "correct_answer": 2,
+                    "explanation": "The statement aligns with the common understanding of the topic."
+                },
+                {
+                    "question": "How should this topic be applied in a professional setting?",
+                    "options": ["Approach A", "Approach B", "Approach C", "Approach D"],
+                    "correct_answer": 0,
+                    "explanation": "Professional use should follow the most direct and practical approach."
+                },
+            ])
+
+        if "coding challenge" in prompt_lower or "starter_code" in prompt_lower:
+            return json.dumps({
+                "title": "Practical Coding Challenge",
+                "description": "Build a clean, production-style solution for the requested topic.",
+                "starter_code": "def solve(input_data):\n    pass",
+                "test_cases": [
+                    {"input": "sample input", "expected_output": "sample output", "description": "Basic happy path"},
+                    {"input": "edge case", "expected_output": "expected edge output", "description": "Edge case coverage"},
+                ],
+                "language": "python",
+            })
+
+        if "written assignment" in prompt_lower or "rubric" in prompt_lower or "assignment" in prompt_lower:
+            return json.dumps({
+                "title": "Professional Written Assignment",
+                "description": "Prepare a structured, well-reasoned written response that addresses the prompt with examples and clear organization.",
+                "rubric": [
+                    {"criterion": "Understanding", "weight": 30, "description": "Demonstrates correct grasp of the topic"},
+                    {"criterion": "Analysis", "weight": 25, "description": "Shows depth of reasoning and insight"},
+                    {"criterion": "Communication", "weight": 25, "description": "Clear, professional writing and structure"},
+                    {"criterion": "Practical Application", "weight": 20, "description": "Connects concepts to real-world use"},
+                ],
+            })
+
         if "report" in prompt_lower:
             return json.dumps({
                 "title": "MaverickAI Intelligence Report",

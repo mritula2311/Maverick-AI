@@ -16,9 +16,9 @@ class Settings(BaseSettings):
 
     # Ollama LLM
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "phi3:latest"
-    OLLAMA_CODE_MODEL: str = "phi3:latest"
-    OLLAMA_FAST_MODEL: str = "phi3:latest"
+    OLLAMA_MODEL: str = "gpt-oss:120b-cloud"
+    OLLAMA_CODE_MODEL: str = "gpt-oss:120b-cloud"
+    OLLAMA_FAST_MODEL: str = "gpt-oss:120b-cloud"
 
     # n8n
     N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook"

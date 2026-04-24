@@ -115,7 +115,7 @@ export default function AssignmentPage() {
     const result = await api.workflow.submit(
       {
         assessment_id: assessmentId,
-        submission_type: 'code', // Using 'code' type for AI evaluation
+        submission_type: 'assignment',
         code: submission,
         language: 'text',
       },

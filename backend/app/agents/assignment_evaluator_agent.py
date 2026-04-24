@@ -30,7 +30,7 @@ class AssignmentEvaluatorAgent(BaseAgent):
     def evaluate(self, db, submission: Submission, assessment: Assessment):
         """Main evaluation method for assignment submissions"""
         
-        submission_text = submission.submission_text or ""
+        submission_text = submission.code or ""
         
         # Parse rubric if available
         rubric = {}
@@ -60,6 +60,36 @@ class AssignmentEvaluatorAgent(BaseAgent):
         submission.status = "completed"
         submission.feedback = json.dumps(feedback)
         submission.graded_at = datetime.now(timezone.utc)
+
+        # Record assignment history so the fresher history view has versioned attempts.
+        try:
+            from app.models.certification import AssignmentHistory
+            from app.models.fresher import Fresher
+
+            fresher_obj = db.query(Fresher).filter(Fresher.user_id == submission.user_id).first()
+            fresher_id = fresher_obj.id if fresher_obj else None
+
+            latest = db.query(AssignmentHistory).filter(
+                AssignmentHistory.submission_id == submission.id
+            ).order_by(AssignmentHistory.version.desc()).first()
+            next_version = (latest.version + 1) if latest else 1
+
+            history = AssignmentHistory(
+                submission_id=submission.id,
+                fresher_id=fresher_id,
+                assessment_id=submission.assessment_id,
+                version=next_version,
+                content=submission_text,
+                status=submission.status,
+                score=submission.score,
+                feedback=submission.feedback,
+                submitted_at=submission.submitted_at,
+                graded_at=submission.graded_at,
+            )
+            if fresher_id:
+                db.add(history)
+        except Exception as e:
+            print(f"[AssignmentEvaluatorAgent] assignment history record failed: {e}")
         db.commit()
 
         print(f"[AssignmentEvaluatorAgent] ✓ Evaluated assignment: {score:.1f}% ({pass_status})")

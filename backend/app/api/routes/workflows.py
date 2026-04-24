@@ -15,7 +15,7 @@ router = APIRouter(tags=["Workflows"])
 def submit_workflow(data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     assessment_id = data.get("assessment_id")
     submission_type = data.get("submission_type", "quiz") 
-    code = data.get("code")  # May still be present in old requests, but ignored
+    code = data.get("code") or data.get("submission_text") or data.get("content")
     language = data.get("language", "python")
     answers = data.get("answers")
 
@@ -33,7 +33,7 @@ def submit_workflow(data: dict, db: Session = Depends(get_db), current_user: Use
         assessment_id=int(assessment_id),
         user_id=current_user.id,
         submission_type=submission_type,
-        code=None,  # Code no longer used
+        code=code,
         language=language,
         answers=json.dumps(answers) if answers else None,
         status="grading",

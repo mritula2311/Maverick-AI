@@ -92,7 +92,7 @@ class AssignmentEvaluatorAgent(BaseAgent):
             print(f"[AssignmentEvaluatorAgent] assignment history record failed: {e}")
         db.commit()
 
-        print(f"[AssignmentEvaluatorAgent] ✓ Evaluated assignment: {score:.1f}% ({pass_status})")
+        print(f"[AssignmentEvaluatorAgent] [OK] Evaluated assignment: {score:.1f}% ({pass_status})")
 
         return {
             "score": round(score, 2),
@@ -113,7 +113,7 @@ Maximum Score: {max_score}
 Passing Threshold: {passing_score}
 
 CANDIDATE'S SUBMISSION:
-{submission_text[:2000]}  # First 2000 chars
+{submission_text[:2000]}
 
 EVALUATION CRITERIA:
 """
@@ -189,11 +189,11 @@ Be constructive, specific, and professional. Return ONLY valid JSON."""
                 feedback["score"] = max(0, min(100, feedback.get("score", 75)))
                 return feedback
             else:
-                print(f"[AssignmentEvaluatorAgent] ⚠ LLM response missing required fields")
+                print(f"[AssignmentEvaluatorAgent] [WARN] LLM response missing required fields")
                 return self._get_fallback_feedback(submission_text)
                 
         except Exception as e:
-            print(f"[AssignmentEvaluatorAgent] ✗ LLM feedback error: {e}")
+            print(f"[AssignmentEvaluatorAgent] [ERR] LLM feedback error: {e}")
             return self._get_fallback_feedback(submission_text)
 
     def _extract_json_from_llm_response(self, llm_response: str) -> dict:
@@ -220,7 +220,7 @@ Be constructive, specific, and professional. Return ONLY valid JSON."""
             
             return json.loads(response_text)
         except Exception as e:
-            print(f"[AssignmentEvaluatorAgent] ✗ JSON parse error: {e}")
+            print(f"[AssignmentEvaluatorAgent] [ERR] JSON parse error: {e}")
             return {}
 
     def _get_fallback_feedback(self, submission_text):

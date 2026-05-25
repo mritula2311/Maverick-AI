@@ -479,7 +479,7 @@ Return JSON with:
                 passed_count=passed,
                 failed_count=len(fresher_submissions) - passed,
                 pass_rate=pass_rate,
-                skills_breakdown=json.dumps(skills_breakdown),
+                skills_breakdown=skills_breakdown,
                 risk_level=fresher.risk_level,
                 risk_score=fresher.risk_score,
                 engagement_score=75 + (avg_score / 100 * 25),  # Score-based engagement

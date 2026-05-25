@@ -12,8 +12,8 @@ class OllamaClient:
         self._available = None
 
     def is_available(self) -> bool:
-        if self._available is not None:
-            return self._available
+        if self._available:  # only cache True; re-check if previously False
+            return True
         try:
             resp = requests.get(f"{self.base_url}/api/tags", timeout=2)
             self._available = resp.status_code == 200
@@ -200,6 +200,35 @@ class OllamaClient:
                     "Assign additional practice problems",
                     "Monitor progress over next week"
                 ]
+            })
+
+        if "corporate hr learning" in prompt_lower and "competency_level" in prompt_lower:
+            # HR quiz evaluator feedback schema
+            return json.dumps({
+                "overall_assessment": "Good attempt on the assessment. You have a solid grasp of the basics, but there are specific areas that need further review.",
+                "competency_level": "Meets Expectations",
+                "strengths": ["Demonstrates foundational understanding of core concepts", "Completed the assessment within the allotted time"],
+                "development_areas": ["Review specific topic areas where answers were incorrect", "Strengthen understanding of edge cases and exceptions"],
+                "recommended_actions": ["Schedule a review session with your mentor for the topics missed", "Complete targeted practice exercises in weak areas", "Re-attempt the assessment after additional study"],
+                "hr_notes": "Candidate shows potential with foundational knowledge. Targeted learning support recommended."
+            })
+
+        if "corporate hr learning" in prompt_lower and "competency_rating" in prompt_lower:
+            # HR assignment evaluator feedback schema
+            return json.dumps({
+                "score": 75,
+                "overall_assessment": "The submission demonstrates adequate understanding of the topic with clear communication. Some areas could benefit from more depth and professional refinement.",
+                "competency_rating": "Adequate",
+                "strengths": ["Clear and organized structure", "Demonstrates basic understanding of requirements", "Meets minimum length and content expectations"],
+                "areas_for_improvement": ["Add more specific examples to support arguments", "Strengthen the analytical depth of the response", "Enhance professional presentation and formatting"],
+                "content_analysis": {
+                    "depth_of_understanding": "Basic concepts are present but require deeper technical analysis.",
+                    "clarity_of_communication": "Communication is clear but would benefit from more structured organization.",
+                    "professional_quality": "Presentation meets basic standards for an entry-level professional."
+                },
+                "developmental_recommendations": ["Complete a business writing course to enhance documentation skills", "Review industry examples of professional technical reports", "Practice structured writing with clear sections and logical flow"],
+                "business_readiness_notes": "Work demonstrates foundational documentation skills appropriate for an entry-level role with mentorship.",
+                "hr_recommendation": "Candidate shows adequate documentation skills. Standard onboarding training recommended."
             })
 
         if "quiz" in prompt_lower:

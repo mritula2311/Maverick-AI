@@ -16,9 +16,9 @@ class Settings(BaseSettings):
 
     # Ollama LLM
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "gpt-oss:120b-cloud"
-    OLLAMA_CODE_MODEL: str = "gpt-oss:120b-cloud"
-    OLLAMA_FAST_MODEL: str = "gpt-oss:120b-cloud"
+    OLLAMA_MODEL: str = "neural-chat"
+    OLLAMA_CODE_MODEL: str = "mistral"
+    OLLAMA_FAST_MODEL: str = "neural-chat"
 
     # n8n
     N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook"

@@ -12,7 +12,8 @@ from app.utils.pdf_generator_v2 import pdf_generator
 from datetime import datetime, timedelta
 import json
 
-router = APIRouter(prefix="/api/v1", tags=["premium"])
+from app.models.user import User
+router = APIRouter(prefix="/api/v1", tags=["premium"], dependencies=[Depends(get_current_user)])
 
 
 # ============= BADGE ROUTES =============
@@ -41,7 +42,7 @@ def list_badges(db: Session = Depends(get_db)):
 @router.get("/freshers/{fresher_id}/badges")
 def get_fresher_badges(fresher_id: int, db: Session = Depends(get_db)):
     """Get badges earned by a fresher."""
-    fresher = db.query(Fresher).get(fresher_id)
+    fresher = db.get(Fresher, fresher_id)
     if not fresher:
         raise HTTPException(status_code=404, detail="Fresher not found")
     
@@ -66,8 +67,8 @@ def get_fresher_badges(fresher_id: int, db: Session = Depends(get_db)):
 @router.post("/freshers/{fresher_id}/badges/{badge_id}")
 def assign_badge(fresher_id: int, badge_id: int, score: float, assessment_id: int = None, db: Session = Depends(get_db)):
     """Manually assign a badge to a fresher."""
-    fresher = db.query(Fresher).get(fresher_id)
-    badge = db.query(Badge).get(badge_id)
+    fresher = db.get(Fresher, fresher_id)
+    badge = db.get(Badge, badge_id)
     
     if not fresher or not badge:
         raise HTTPException(status_code=404, detail="Fresher or badge not found")
@@ -139,7 +140,7 @@ def create_assessment_schedule(
     db: Session = Depends(get_db)
 ):
     """Create a new assessment schedule."""
-    assessment = db.query(Assessment).get(assessment_id)
+    assessment = db.get(Assessment, assessment_id)
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment not found")
     
@@ -166,7 +167,7 @@ def create_assessment_schedule(
 @router.get("/freshers/{fresher_id}/schedules")
 def get_fresher_schedules(fresher_id: int, db: Session = Depends(get_db)):
     """Get upcoming assessment schedules for a fresher."""
-    fresher = db.query(Fresher).get(fresher_id)
+    fresher = db.get(Fresher, fresher_id)
     if not fresher:
         raise HTTPException(status_code=404, detail="Fresher not found")
     
@@ -203,7 +204,7 @@ def get_fresher_schedules(fresher_id: int, db: Session = Depends(get_db)):
 @router.get("/freshers/{fresher_id}/analytics")
 def get_fresher_analytics(fresher_id: int, db: Session = Depends(get_db)):
     """Get performance analytics for a fresher."""
-    fresher = db.query(Fresher).get(fresher_id)
+    fresher = db.get(Fresher, fresher_id)
     if not fresher:
         raise HTTPException(status_code=404, detail="Fresher not found")
     
@@ -240,7 +241,7 @@ def get_cohort_comparison(db: Session = Depends(get_db)):
     
     freshers_data = []
     for analytics in analytics_list:
-        fresher = db.query(Fresher).get(analytics.fresher_id)
+        fresher = db.get(Fresher, analytics.fresher_id)
         if fresher and fresher.user_id:
             user = fresher.user_id  # Simplified for brevity
             freshers_data.append({
@@ -273,7 +274,7 @@ def get_cohort_comparison(db: Session = Depends(get_db)):
 @router.post("/analytics/update/{fresher_id}")
 def update_fresher_analytics(fresher_id: int, db: Session = Depends(get_db)):
     """Recalculate analytics for a fresher based on submissions."""
-    fresher = db.query(Fresher).get(fresher_id)
+    fresher = db.get(Fresher, fresher_id)
     if not fresher:
         raise HTTPException(status_code=404, detail="Fresher not found")
     
@@ -283,11 +284,12 @@ def update_fresher_analytics(fresher_id: int, db: Session = Depends(get_db)):
     if not submissions:
         return {"status": "no_submissions"}
     
-    # Calculate metrics
-    total_score = sum(s.score for s in submissions)
-    avg_score = total_score / len(submissions) if submissions else 0
-    
-    quiz_subs = [s for s in submissions if s.submission_type == 'quiz']
+    # Calculate metrics (guard against None scores)
+    scored = [s for s in submissions if s.score is not None]
+    total_score = sum(s.score for s in scored)
+    avg_score = total_score / len(scored) if scored else 0
+
+    quiz_subs = [s for s in scored if s.submission_type == 'quiz']
     quiz_avg = sum(s.score for s in quiz_subs) / len(quiz_subs) if quiz_subs else 0
     
     passed = sum(1 for s in submissions if s.pass_status == 'pass')
@@ -325,11 +327,11 @@ def update_fresher_analytics(fresher_id: int, db: Session = Depends(get_db)):
 @router.get("/submissions/{submission_id}/pdf")
 def export_submission_pdf(submission_id: int, db: Session = Depends(get_db)):
     """Export individual submission as PDF."""
-    submission = db.query(Submission).get(submission_id)
+    submission = db.get(Submission, submission_id)
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
-    
-    assessment = db.query(Assessment).get(submission.assessment_id)
+
+    assessment = db.get(Assessment, submission.assessment_id)
     fresher = db.query(Fresher).filter(Fresher.user_id == submission.user_id).first()
     
     if not assessment or not fresher:
@@ -359,7 +361,7 @@ def export_submission_pdf(submission_id: int, db: Session = Depends(get_db)):
 @router.get("/freshers/{fresher_id}/performance-report/pdf")
 def export_performance_report_pdf(fresher_id: int, db: Session = Depends(get_db)):
     """Export comprehensive performance report as PDF."""
-    fresher = db.query(Fresher).get(fresher_id)
+    fresher = db.get(Fresher, fresher_id)
     if not fresher:
         raise HTTPException(status_code=404, detail="Fresher not found")
     
@@ -400,11 +402,11 @@ def export_performance_report_pdf(fresher_id: int, db: Session = Depends(get_db)
 @router.post("/submissions/{submission_id}/ai-feedback")
 def generate_ai_feedback(submission_id: int, db: Session = Depends(get_db)):
     """Generate AI-powered personalized feedback for a submission."""
-    submission = db.query(Submission).get(submission_id)
+    submission = db.get(Submission, submission_id)
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
-    
-    assessment = db.query(Assessment).get(submission.assessment_id)
+
+    assessment = db.get(Assessment, submission.assessment_id)
     fresher = db.query(Fresher).filter(Fresher.user_id == submission.user_id).first()
     
     submission_data = {
@@ -432,7 +434,7 @@ def generate_ai_feedback(submission_id: int, db: Session = Depends(get_db)):
 @router.get("/freshers/{fresher_id}/ai-insights")
 def get_ai_performance_insights(fresher_id: int, db: Session = Depends(get_db)):
     """Get AI-powered performance insights and recommendations."""
-    fresher = db.query(Fresher).get(fresher_id)
+    fresher = db.get(Fresher, fresher_id)
     if not fresher:
         raise HTTPException(status_code=404, detail="Fresher not found")
     

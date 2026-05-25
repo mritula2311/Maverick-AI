@@ -16,20 +16,20 @@ def list_curricula(db: Session = Depends(get_db), current_user: User = Depends(g
     return [_curriculum_dict(c) for c in curricula]
 
 
-@router.get("/{curriculum_id}")
-def get_curriculum(curriculum_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    c = db.query(Curriculum).filter(Curriculum.id == int(curriculum_id)).first()
-    if not c:
-        raise HTTPException(status_code=404, detail="Curriculum not found")
-    return _curriculum_dict(c)
-
-
 @router.get("/fresher/{fresher_id}")
 def get_fresher_curriculum(fresher_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Return the first curriculum as default assignment
     c = db.query(Curriculum).first()
     if not c:
         raise HTTPException(status_code=404, detail="No curriculum found")
+    return _curriculum_dict(c)
+
+
+@router.get("/{curriculum_id}")
+def get_curriculum(curriculum_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    c = db.query(Curriculum).filter(Curriculum.id == int(curriculum_id)).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Curriculum not found")
     return _curriculum_dict(c)
 
 

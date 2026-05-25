@@ -75,7 +75,11 @@ export default function AdminDashboardPage() {
       if (s.error) setError(s.error);
       if (u.error) setError(u.error);
       if (s.data) setStats(s.data as AdminStats);
-      if (u.data) setUsers(u.data as AdminUser[]);
+      if (u.data) {
+        // Handle both array and wrapped response { users: [...] }
+        const userList = Array.isArray(u.data) ? u.data : (u.data as any).users || [];
+        setUsers(userList as AdminUser[]);
+      }
     } catch (e) {
       setError("Failed to load admin data");
     } finally {

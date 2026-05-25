@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api-service';
 import { AssessmentDetail } from '@/lib/types';
@@ -20,6 +20,7 @@ export default function AssignmentPage() {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const handleSubmitRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const loadAssessment = async () => {
@@ -58,21 +59,25 @@ export default function AssignmentPage() {
     loadAssessment();
   }, [assessmentId, router, token, authLoading]);
 
-  // Timer countdown
+  // Keep ref in sync so the timer can call the latest handleSubmit without a stale closure
+  useEffect(() => { handleSubmitRef.current = handleSubmit; });
+
+  // Timer countdown — chained timeouts so the interval is never recreated mid-tick
   useEffect(() => {
     if (timeRemaining === null || timeRemaining <= 0) return;
 
-    const timer = setInterval(() => {
+    const timer = setTimeout(() => {
       setTimeRemaining((prev) => {
-        if (prev === null || prev <= 1) {
-          handleSubmit();
+        const next = (prev ?? 1) - 1;
+        if (next <= 0) {
+          setTimeout(() => handleSubmitRef.current(), 0);
           return 0;
         }
-        return prev - 1;
+        return next;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => clearTimeout(timer);
   }, [timeRemaining]);
 
   const formatTime = (seconds: number) => {

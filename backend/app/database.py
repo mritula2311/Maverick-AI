@@ -33,3 +33,26 @@ def create_tables():
     from app.models.analytics import PerformanceAnalytics
     from app.models.certification import Certification, AssignmentHistory
     Base.metadata.create_all(bind=engine)
+    _migrate_missing_columns()
+
+
+def _migrate_missing_columns():
+    """Add any columns that exist in models but not in the DB (SQLite-safe ALTER TABLE)."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+    with engine.connect() as conn:
+        for table_name, table in Base.metadata.tables.items():
+            if table_name not in existing_tables:
+                continue
+            db_cols = {col["name"] for col in inspector.get_columns(table_name)}
+            for col in table.columns:
+                if col.name not in db_cols:
+                    col_type = col.type.compile(engine.dialect)
+                    nullable = "NULL" if col.nullable else "NOT NULL DEFAULT ''"
+                    try:
+                        conn.execute(text(f'ALTER TABLE "{table_name}" ADD COLUMN "{col.name}" {col_type}'))
+                        conn.commit()
+                        print(f"[MIGRATE] Added column {table_name}.{col.name}")
+                    except Exception as e:
+                        print(f"[MIGRATE] Skip {table_name}.{col.name}: {e}")

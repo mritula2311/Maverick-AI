@@ -123,27 +123,38 @@ def _build_fresher_details(db: Session, fresher):
 router = APIRouter(tags=["Admin"])
 
 
+def _require_admin(current_user: User = Depends(get_current_user)):
+    """Enforce admin role requirement"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
 @router.get("/users")
-def get_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_users(db: Session = Depends(get_db), admin_user: User = Depends(_require_admin)):
     users = db.query(User).all()
-    return [
-        {
-            "id": str(u.id),
-            "email": u.email,
-            "first_name": u.first_name,
-            "last_name": u.last_name,
-            "role": u.role,
-            "department": u.department,
-            "is_active": u.is_active,
-            "created_at": str(u.created_at) if u.created_at else "",
-            "updated_at": str(u.updated_at) if u.updated_at else "",
-        }
-        for u in users
-    ]
+    return {
+        "items": [
+            {
+                "id": str(u.id),
+                "email": u.email,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "role": u.role,
+                "department": u.department,
+                "is_active": u.is_active,
+                "created_at": str(u.created_at) if u.created_at else "",
+                "updated_at": str(u.updated_at) if u.updated_at else "",
+            }
+            for u in users
+        ],
+        "total": len(users),
+        "page": 1,
+    }
 
 
 @router.post("/users")
-def create_user(data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_user(data: dict, db: Session = Depends(get_db), admin_user: User = Depends(_require_admin)):
     existing = db.query(User).filter(User.email == data.get("email")).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")

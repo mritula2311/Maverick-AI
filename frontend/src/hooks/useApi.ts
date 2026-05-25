@@ -41,41 +41,6 @@ export function useApi<T>(
   return { data, error, isLoading, execute, setData };
 }
 
-export function useAuth() {
-  const [user, setUser] = useState<any | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check for stored token and fetch user
-    const token = localStorage.getItem('token');
-    if (token) {
-      // Fetch user data
-      setIsLoading(false);
-    } else {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const login = useCallback(async (email: string, password: string) => {
-    // Mock login
-    const mockUser = {
-      id: 1,
-      email,
-      name: 'Demo User',
-      role: email.includes('manager') ? 'manager' : 'fresher',
-    };
-    setUser(mockUser);
-    localStorage.setItem('token', 'mock-token');
-    return mockUser;
-  }, []);
-
-  const logout = useCallback(() => {
-    setUser(null);
-    localStorage.removeItem('token');
-  }, []);
-
-  return { user, isLoading, login, logout, isAuthenticated: !!user };
-}
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [storedValue, setStoredValue] = useState<T>(() => {

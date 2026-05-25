@@ -145,7 +145,14 @@ Return ONLY the JSON object. Start with {{ and end with }}."""
 @router.get("/")
 def list_assessments(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     assessments = db.query(Assessment).filter(Assessment.is_active == True).all()
-    return [_assessment_detail(a) for a in assessments]
+    items = [_assessment_detail(a) for a in assessments]
+    return {
+        "items": items,
+        "total": len(items),
+        "page": 1,
+        "page_size": len(items)
+    }
+
 
 
 @router.get("/my/pending")

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api-service';
 import { useAuth } from '@/lib/auth-context';
@@ -65,10 +65,13 @@ export default function ResultsPage() {
   const [result, setResult] = useState<WorkflowStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pollingCount, setPollingCount] = useState(0);
+  // Use a ref (not state) so poll count changes never re-trigger the effect
+  const pollingCountRef = useRef(0);
 
   useEffect(() => {
     console.log(`[RESULTS] Page loaded, traceId=${traceId}, assessmentId=${assessmentId}`);
+    // Reset poll counter whenever the key deps change (new trace or new token)
+    pollingCountRef.current = 0;
 
     if (!traceId) {
       console.log(`[RESULTS] No trace ID provided, fetching latest result for assessment=${assessmentId}`);
@@ -116,7 +119,11 @@ export default function ResultsPage() {
       return;
     }
 
+    // cancelled flag prevents state updates after the effect is cleaned up
+    let cancelled = false;
+
     const pollStatus = async () => {
+      if (cancelled) return;
       if (authLoading) return;
 
       if (!token) {
@@ -124,8 +131,10 @@ export default function ResultsPage() {
         return;
       }
 
-      console.log(`[RESULTS] Polling status for trace_id=${traceId}`);
+      console.log(`[RESULTS] Polling status for trace_id=${traceId} (attempt ${pollingCountRef.current + 1})`);
       const response = await api.workflow.getStatus(traceId, token);
+
+      if (cancelled) return;
 
       if (response.error) {
         console.log(`[RESULTS] Status API error:`, response.error);
@@ -166,9 +175,9 @@ export default function ResultsPage() {
           setError('Assessment grading failed. Please contact support.');
           setLoading(false);
         } else {
-          // Continue polling
-          setPollingCount((prev) => prev + 1);
-          if (pollingCount < 30) {
+          // Continue polling — increment ref (not state) so the effect doesn't re-fire
+          pollingCountRef.current += 1;
+          if (pollingCountRef.current < 30) {
             setTimeout(pollStatus, 2000);
           } else {
             setError('Grading is taking longer than expected. Please check back later.');
@@ -179,7 +188,12 @@ export default function ResultsPage() {
     };
 
     pollStatus();
-  }, [traceId, router, pollingCount, token, authLoading]);
+
+    // Cleanup: mark as cancelled so no stale updates arrive after unmount or dep change
+    return () => { cancelled = true; };
+  // pollingCountRef is intentionally excluded — it's a ref, not reactive state
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traceId, router, token, authLoading]);
 
   const getRiskColor = (level: string) => {
     switch (level?.toLowerCase()) {

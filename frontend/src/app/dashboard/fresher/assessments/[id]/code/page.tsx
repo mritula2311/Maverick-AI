@@ -28,6 +28,7 @@ export default function CodeSubmissionPage() {
   const [testResults, setTestResults] = useState<any[]>([]);
   const [selectedTestCase, setSelectedTestCase] = useState<number>(0);
   const editorRef = useRef<any>(null);
+  const handleSubmitRef = useRef<() => void>(() => {});
 
   // Load assessment data
   useEffect(() => {
@@ -70,21 +71,25 @@ export default function CodeSubmissionPage() {
     loadAssessment();
   }, [assessmentId, router, token, authLoading]);
 
-  // Timer countdown
+  // Keep ref in sync so the timer can call the latest handleSubmit without a stale closure
+  useEffect(() => { handleSubmitRef.current = handleSubmit; });
+
+  // Timer countdown — chained timeouts so the interval is never recreated mid-tick
   useEffect(() => {
     if (timeRemaining === null || timeRemaining <= 0) return;
 
-    const timer = setInterval(() => {
+    const timer = setTimeout(() => {
       setTimeRemaining((prev) => {
-        if (prev === null || prev <= 1) {
-          handleSubmit();
+        const next = (prev ?? 1) - 1;
+        if (next <= 0) {
+          setTimeout(() => handleSubmitRef.current(), 0);
           return 0;
         }
-        return prev - 1;
+        return next;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => clearTimeout(timer);
   }, [timeRemaining]);
 
   const getDefaultCode = (lang: string) => {

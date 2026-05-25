@@ -36,12 +36,16 @@ class AssessmentAgent(BaseAgent):
                 response_text = response_text[json_start:json_end]
             
             parsed = json.loads(response_text)
-            print(f"[AssessmentAgent] ✓ Successfully parsed LLM JSON response")
+            print(f"[AssessmentAgent] [OK] Successfully parsed LLM JSON response")
             return parsed
         except Exception as e:
-            print(f"[AssessmentAgent] ✗ JSON parse error: {e}")
+            print(f"[AssessmentAgent] [ERR] JSON parse error: {e}")
             print(f"[AssessmentAgent] Raw response: {llm_response[:200]}...")
             return {}
+
+    def evaluate(self, db, submission: Submission, assessment: Assessment = None):
+        """Alias for execute() — satisfies the agent.evaluate(db, sub, assessment) interface."""
+        return self.execute(db, submission)
 
     def execute(self, db, submission: Submission):
         assessment = db.query(Assessment).filter(Assessment.id == submission.assessment_id).first()
@@ -195,10 +199,10 @@ IMPORTANT: Return ONLY the JSON object, nothing else.
             if not feedback_data.get("overall_comment"):
                 feedback_data["overall_comment"] = f"You scored {score:.1f}%. {'Excellent work!' if score >= 80 else 'Good effort!' if score >= 60 else 'Keep practicing!'}"
             
-            print(f"[AssessmentAgent] ✓ QUIZ LLM feedback parsed successfully, score: {score:.1f}%")
+            print(f"[AssessmentAgent] [OK] QUIZ LLM feedback parsed successfully, score: {score:.1f}%")
             
         except Exception as e:
-            print(f"[AssessmentAgent] ✗ QUIZ LLM feedback error: {e}, using fallback")
+            print(f"[AssessmentAgent] [ERR] QUIZ LLM feedback error: {e}, using fallback")
             
             # Generate personalized explanations using LLM individually for each error
             # This is slower but ensures high-quality feedback even if the main JSON generation failed
@@ -434,9 +438,9 @@ IMPORTANT: Return ONLY the JSON object, nothing else.
             
             style_score = review.get("style_score", review.get("score", 75))
             overall_comment = review.get("overall_comment", review.get("overall", review.get("feedback", "Code reviewed successfully")))
-            print(f"[AssessmentAgent] ✓ CODE LLM feedback parsed, test_score: {test_score:.1f}%, quality_score: {style_score}")
+            print(f"[AssessmentAgent] [OK] CODE LLM feedback parsed, test_score: {test_score:.1f}%, quality_score: {style_score}")
         except Exception as e:
-            print(f"[AssessmentAgent] ✗ CODE LLM parse error: {e}, using fallback")
+            print(f"[AssessmentAgent] [ERR] CODE LLM parse error: {e}, using fallback")
             style_score = 75
             overall_comment = "Code reviewed successfully"
             review = {
@@ -557,9 +561,9 @@ IMPORTANT: Return ONLY the JSON object, nothing else.
             
             score = review.get("score", 70)
             overall_comment = review.get("overall_comment", "Assignment received and reviewed.")
-            print(f"[AssessmentAgent] ✓ ASSIGNMENT LLM feedback parsed successfully, score: {score}")
+            print(f"[AssessmentAgent] [OK] ASSIGNMENT LLM feedback parsed successfully, score: {score}")
         except Exception as e:
-            print(f"[AssessmentAgent] ✗ ASSIGNMENT LLM parse error: {e}, using fallback")
+            print(f"[AssessmentAgent] [ERR] ASSIGNMENT LLM parse error: {e}, using fallback")
             score = 70
             overall_comment = "Assignment reviewed successfully."
             review = {

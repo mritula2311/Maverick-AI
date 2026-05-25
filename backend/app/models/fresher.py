@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -17,6 +17,7 @@ class Fresher(Base):
     overall_progress = Column(Float, default=0.0)
     risk_level = Column(String, default="low")  # low, medium, high, critical
     risk_score = Column(Float, default=0.0)
+    summary = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

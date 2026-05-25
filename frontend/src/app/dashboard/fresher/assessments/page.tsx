@@ -35,7 +35,10 @@ export default function AssessmentsPage() {
         }
 
         if (result.data) {
-          setAssessments(result.data as any);
+          // Handle response structure: { items: [...] }
+          const data = result.data as any;
+          const assessmentList = Array.isArray(data) ? data : data.items || [];
+          setAssessments(assessmentList);
         }
         setLoading(false);
       } catch (err) {

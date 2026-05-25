@@ -70,7 +70,7 @@ def submit_workflow(data: dict, db: Session = Depends(get_db), current_user: Use
         # Refresh submission to get updated status
         db.refresh(sub)
         
-        print(f"[SUBMIT] ✅ Grading complete!")
+        print(f"[SUBMIT] [OK] Grading complete!")
         print(f"[SUBMIT]   - Score: {sub.score}/{sub.max_score}")
         print(f"[SUBMIT]   - Pass Status: {sub.pass_status}")
         print(f"[SUBMIT]   - Status: {sub.status}")
@@ -86,7 +86,7 @@ def submit_workflow(data: dict, db: Session = Depends(get_db), current_user: Use
                 print(f"[SUBMIT] Updating profile for fresher strategy...")
                 profile_agent = ProfileAgent()
                 profile_agent.update_after_assessment(db, fresher, sub)
-                print(f"[SUBMIT] ✅ Profile updated successfully (Skills & Progress)")
+                print(f"[SUBMIT] [OK] Profile updated successfully (Skills & Progress)")
         except Exception as pe:
             print(f"[SUBMIT WARNING] Profile update failed: {pe}")
             # Don't fail the whole request just because profile update failed

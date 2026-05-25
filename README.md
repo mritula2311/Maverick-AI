@@ -1,239 +1,753 @@
-# MaverickAI Project Guide
+# MaverickAI — AI-Powered Fresher Onboarding & Training Platform
 
-## Overview
-MaverickAI is a FastAPI + Next.js fresher onboarding platform with role-based dashboards, JWT authentication, automated assessments, assignment history tracking, and HR-style analytics.
+MaverickAI is a full-stack enterprise platform that automates the complete fresher onboarding lifecycle using a multi-agent AI architecture. Freshers follow structured training curricula, take AI-evaluated quizzes and assignments, earn badges, and receive PDF progress reports. Managers get real-time analytics on their cohort. Admins control the entire platform.
 
-## Main Application Paths
-- Frontend app: `http://localhost:3000`
-- Login page: `http://localhost:3000/login`
-- Fresher dashboard: `http://localhost:3000/dashboard/fresher`
-- Manager dashboard: `http://localhost:3000/dashboard/manager`
-- Admin dashboard: `http://localhost:3000/dashboard/admin`
-- API base URL: `http://localhost:8000/api/v1`
-- API docs: `http://localhost:8000/docs`
-- Health check: `http://localhost:8000/health`
+Built for the **Hexaware Hackathon 2026**.
 
-## How Authentication Works
-1. The user signs in on the frontend login page.
-2. `frontend/src/lib/auth-context.tsx` calls `POST /api/v1/auth/login`.
-3. The backend returns a JWT token and the user payload.
-4. The frontend stores the token in local storage.
-5. The login page redirects by role:
-   - `fresher` -> `/dashboard/fresher`
-   - `manager` -> `/dashboard/manager`
-   - `admin` -> `/dashboard/admin`
+---
 
-## Admin Dashboard
-The admin dashboard is a frontend route, not a separate backend page.
+## Table of Contents
 
-### Where it is
-- Route: `/dashboard/admin`
-- Component: `frontend/src/app/dashboard/admin/page.tsx`
+1. [Features](#features)
+2. [Tech Stack](#tech-stack)
+3. [System Architecture](#system-architecture)
+4. [Prerequisites](#prerequisites)
+5. [Quick Start](#quick-start)
+6. [Manual Setup](#manual-setup)
+7. [Default Credentials](#default-credentials)
+8. [Role Capabilities](#role-capabilities)
+9. [AI Agent Details](#ai-agent-details)
+10. [Ollama Integration](#ollama-integration)
+11. [API Reference](#api-reference)
+12. [Project Structure](#project-structure)
+13. [Environment Variables](#environment-variables)
+14. [Known Limitations](#known-limitations)
 
-### How to log in
-Use the seeded admin account:
-- Email: `admin@maverick.ai`
-- Password: `admin123`
+---
 
-### What the admin dashboard does
-- Loads system stats from `GET /api/v1/admin/stats`
-- Lists users from `GET /api/v1/admin/users`
-- Creates users through `POST /api/v1/admin/users`
-- Seeds data through `POST /api/v1/admin/seed-data`
-- Shows warnings through `GET /api/v1/admin/warnings`
-- Shows the overall cohort report through `GET /api/v1/admin/overall-report`
+## Features
 
-### Admin access logic
-The backend does not expose a special admin login endpoint. Admin access is determined by the authenticated user's role returned from `GET /api/v1/auth/me`.
+- **AI Quiz Evaluation** — LLM-powered grading that returns a competency level, strengths, development areas, recommended actions, and HR notes for every quiz submission
+- **AI Assignment Evaluation** — Rubric-based scoring with depth-of-understanding analysis, professional quality rating, and business readiness assessment
+- **Automated Onboarding** — Agent-driven curriculum assignment and schedule generation personalised to each fresher's department
+- **Performance Analytics** — Real-time score tracking, progress trends, and batch-level comparisons for managers
+- **PDF Report Generation** — Downloadable individual progress reports and assessment result exports
+- **Badge & Certification System** — Badges awarded automatically when score thresholds are crossed; certification records maintained per curriculum
+- **Role-Based Access Control** — Three completely separate dashboards (fresher / manager / admin) with JWT-enforced permissions
+- **Mock AI Fallback** — Every flow works without Ollama installed; evaluations return deterministic mock responses with the correct schema
 
-## Assignment History Logic
-This repository has two related concepts:
-- Assessment attempts shown in the fresher dashboard history table
-- Versioned assignment history stored in the `assignment_history` table
+---
 
-### What was broken
-- Assignment submissions were being dropped before grading because the workflow ignored the submitted content field.
-- The assignment evaluator was reading a nonexistent field instead of the stored submission text.
-- The assignment page was sending the wrong submission type, so assignment attempts were not classified correctly.
+## Tech Stack
 
-### What now happens
-1. The assignment page submits with `submission_type: "assignment"`.
-2. The workflow preserves the submitted text in `Submission.code`.
-3. `AssignmentEvaluatorAgent` evaluates the saved text.
-4. The evaluator writes a row into `assignment_history`.
-5. The fresher dashboard history table reads completed assessment attempts from `GET /api/v1/freshers/{fresher_id}/assessment-evaluations`.
-6. The assignment history API also supports direct reads from:
-   - `GET /api/v1/certifications/assignment-history/fresher/{fresher_id}`
-   - `GET /api/v1/certifications/assignment-history/submission/{submission_id}`
+| Layer | Technology | Version |
+|---|---|---|
+| Backend framework | FastAPI | 0.104.1 |
+| ASGI server | Uvicorn | 0.24.0 |
+| ORM | SQLAlchemy | 2.0.23 |
+| Database | SQLite (local) | — |
+| Auth | python-jose (JWT) + passlib/bcrypt | 3.3.0 / 4.1.2 |
+| LLM runtime | Ollama HTTP API | latest |
+| PDF (reports) | fpdf2 | 2.7.6 |
+| PDF (premium) | reportlab | 4.0.7 |
+| Frontend framework | Next.js | 14 |
+| Language | TypeScript | 5 |
+| Styling | Tailwind CSS | 3 |
 
-### Relevant backend files
-- `backend/app/api/routes/workflows.py`
-- `backend/app/agents/assignment_evaluator_agent.py`
-- `backend/app/api/routes/certifications.py`
-- `backend/app/models/certification.py`
+---
 
-## Backend Route Map
+## System Architecture
 
-### Authentication
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/register`
-- `GET /api/v1/auth/me`
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                      Next.js 14 Frontend                         │
+│          http://localhost:3000                                    │
+│                                                                  │
+│   ┌─────────────────┐  ┌──────────────────┐  ┌──────────────┐   │
+│   │ Fresher Dashboard│  │Manager Dashboard │  │ Admin Panel  │   │
+│   │ • Overview       │  │ • Team Overview  │  │ • User Mgmt  │   │
+│   │ • Learning       │  │ • Fresher Detail │  │ • Curricula  │   │
+│   │ • Schedule       │  │ • Analytics      │  │ • Stats      │   │
+│   │ • Assessments    │  │ • Reports        │  │              │   │
+│   │ • Profile/Badges │  │ • Schedules      │  │              │   │
+│   └─────────────────┘  └──────────────────┘  └──────────────┘   │
+└───────────────────────────────┬──────────────────────────────────┘
+                                │ REST API (Bearer JWT)
+┌───────────────────────────────▼──────────────────────────────────┐
+│                     FastAPI Backend                               │
+│                  http://localhost:8000                            │
+│                                                                  │
+│  Route Groups:                                                   │
+│  /api/v1/auth          /api/v1/assessments    /api/v1/admin      │
+│  /api/v1/freshers      /api/v1/analytics      /api/v1/premium    │
+│  /api/v1/schedules     /api/v1/reports        /api/v1/certifs    │
+│  /api/v1/curricula     /api/v1/agents         /api/v1/workflows  │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │                      AI Agent Layer                        │  │
+│  │                                                            │  │
+│  │  QuizEvaluatorAgent        AssignmentEvaluatorAgent        │  │
+│  │  AssessmentAgent           ProfileAgent (badges)           │  │
+│  │  OnboardingAgent           AnalyticsAgent                  │  │
+│  │  ReportingAgent                                            │  │
+│  └───────────────────────────┬────────────────────────────────┘  │
+│                              │                                   │
+│  ┌───────────────────────────▼────────────────────────────────┐  │
+│  │          SQLAlchemy 2.0  ←→  SQLite (maverickai.db)        │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬──────────────────────────────────┘
+                                │ HTTP
+┌───────────────────────────────▼──────────────────────────────────┐
+│                    Ollama LLM Server                              │
+│                 http://localhost:11434                            │
+│            Models: neural-chat  |  mistral                       │
+└──────────────────────────────────────────────────────────────────┘
+```
 
-### Freshers
-- `GET /api/v1/freshers/me`
-- `GET /api/v1/freshers/user/{user_id}`
-- `GET /api/v1/freshers`
-- `GET /api/v1/freshers/{fresher_id}`
-- `GET /api/v1/freshers/{fresher_id}/dashboard`
-- `GET /api/v1/freshers/{fresher_id}/skills`
-- `GET /api/v1/freshers/{fresher_id}/training-status`
-- `GET /api/v1/freshers/{fresher_id}/workflow-status`
-- `GET /api/v1/freshers/{fresher_id}/assessment-evaluations`
-- `GET /api/v1/freshers/schedule-items/{item_id}`
-- `PUT /api/v1/freshers/{fresher_id}`
+### Request Flow — Quiz Submission
 
-### Schedules
-- `GET /api/v1/schedules/fresher/{fresher_id}/today`
-- `GET /api/v1/schedules/fresher/{fresher_id}/week`
-- `GET /api/v1/schedules/fresher/{fresher_id}/date/{schedule_date}`
-- `GET /api/v1/schedules/items/{item_id}`
-- `POST /api/v1/schedules/items/{item_id}/start`
-- `POST /api/v1/schedules/items/{item_id}/complete`
-- `POST /api/v1/schedules/generate`
+```
+Fresher submits quiz answers
+        │
+        ▼
+POST /api/v1/assessments/{id}/submit
+        │
+        ▼
+AssessmentAgent.evaluate()
+        │
+        ▼
+QuizEvaluatorAgent.evaluate(questions, answers)
+        │
+        ├── LLMClient.generate(prompt)
+        │         │
+        │         ├── Ollama online  →  neural-chat model response
+        │         └── Ollama offline →  _mock_response() (same schema)
+        │
+        ▼
+Score + HR feedback JSON saved to Submission record
+        │
+        ▼
+ProfileAgent.check_badges(fresher_id)   ← awards badges if threshold crossed
+        │
+        ▼
+AnalyticsAgent.update(fresher_id)       ← recalculates running stats
+        │
+        ▼
+Response returned to frontend with score, competency_level, feedback
+```
 
-### Assessments
-- `GET /api/v1/assessments/`
-- `GET /api/v1/assessments/my/pending`
-- `GET /api/v1/assessments/my/completed`
-- `GET /api/v1/assessments/{assessment_id}`
-- `POST /api/v1/assessments/{assessment_id}/start`
-- `POST /api/v1/assessments/submissions/{submission_id}/answers`
-- `GET /api/v1/assessments/submissions/{submission_id}/results`
-- `GET /api/v1/assessments/{assessment_id}/latest-result`
+---
 
-### Workflows
-- `POST /api/v1/workflows/submit`
-- `GET /api/v1/workflows/status/{trace_id}`
-- `GET /api/v1/workflows/fresher-dashboard`
-- `GET /api/v1/workflows/manager-dashboard`
+## Prerequisites
+
+| Requirement | Minimum Version | Install |
+|---|---|---|
+| Python | 3.11 | https://python.org |
+| Node.js | 18 | https://nodejs.org |
+| npm | bundled with Node | — |
+| Ollama | latest | https://ollama.ai (optional) |
+
+Ollama is optional. The platform runs in **mock mode** without it — all AI evaluations return structured demo responses and every feature remains usable.
+
+---
+
+## Quick Start
+
+### Windows — PowerShell
+
+```powershell
+cd HEXAWARE-HACKATHON-
+.\start.ps1
+```
+
+### Linux / macOS / Git Bash
+
+```bash
+cd HEXAWARE-HACKATHON-
+chmod +x start.sh
+./start.sh
+```
+
+Both scripts do the following automatically:
+
+1. Verify Python, Node.js, and Ollama are installed
+2. Start the Ollama server and pull the `mistral` model (if Ollama is present)
+3. Create a Python virtual environment inside `backend/.venv`
+4. Install all backend dependencies from `requirements.txt`
+5. Create `backend/.env` from the example file if it does not exist
+6. Start the FastAPI backend on **port 8000** and wait for `/health` to return 200
+7. Install frontend npm dependencies if `node_modules` is absent
+8. Create `frontend/.env.local` with the backend URL if it does not exist
+9. Start Next.js on **port 3000**
+10. Print all URLs, credentials, and log paths
+11. Clean up every process on Ctrl+C
+
+**Runtime logs** are written to `logs/` in the project root:
+
+```
+logs/
+  backend.log        backend stdout
+  backend_err.log    backend stderr
+  frontend.log       frontend stdout
+  frontend_err.log   frontend stderr
+  ollama.log         Ollama stdout + pull progress
+  ollama_err.log     Ollama stderr
+```
+
+---
+
+## Manual Setup
+
+If you need to start services individually:
+
+### 1. Ollama (optional)
+
+```bash
+# Start Ollama server
+ollama serve
+
+# Pull models (in a separate terminal)
+ollama pull neural-chat
+ollama pull mistral
+```
+
+### 2. Backend
+
+```bash
+cd backend
+
+# Create and activate virtual environment
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# Linux / macOS
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create environment file
+cp .env.example .env          # or create manually — see Environment Variables section
+
+# Start
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+The SQLite database (`maverickai.db`) is created automatically on first startup along with all seed data.
+
+### 3. Frontend
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install --legacy-peer-deps
+
+# Create environment file
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1" > .env.local
+
+# Start
+npm run dev
+```
+
+---
+
+## Default Credentials
+
+Seed data is inserted automatically when the database is empty:
+
+| Role | Email | Password |
+|---|---|---|
+| Fresher | alice@maverick.ai | password123 |
+| Fresher | john@maverick.ai | password123 |
+| Fresher | bob@maverick.ai | password123 |
+| Fresher | emily@maverick.ai | password123 |
+| Manager | manager@maverick.ai | password123 |
+| Admin | admin@maverick.ai | **admin123** |
+
+> The admin password is intentionally different. Never use these credentials in a production environment.
+
+---
+
+## Role Capabilities
+
+### Fresher
+
+The primary learner interface.
+
+| Section | What it does |
+|---|---|
+| **Overview** | Shows training progress percentage, current score, upcoming assessments, and badges earned |
+| **Learning** | Browse and read curriculum modules assigned by the manager; content is organised by topic and difficulty |
+| **Schedule** | Weekly training calendar showing module sessions and assessment due dates |
+| **Assessments** | Take quizzes (multiple-choice), submit written assignments, or complete code challenges |
+| **Assessment Results** | Detailed AI feedback: competency level, strengths, development areas, recommended actions, and HR notes |
+| **Profile** | Earned badges with criteria, certification progress, overall score history |
+
+Assessment workflow:
+
+1. Fresher opens an assessment and clicks Start
+2. For a quiz: answers multiple-choice questions and submits
+3. For an assignment: writes a free-text response and submits
+4. The AI evaluator runs immediately; results are shown on the results page
+5. Score is added to the fresher's running average; badges are checked and awarded
+
+### Manager
+
+Team oversight and reporting.
+
+| Section | What it does |
+|---|---|
+| **Team Overview** | Table of all freshers with progress %, scores, active status, and at-risk flags |
+| **Fresher Detail** | Full individual profile: quiz history, assignment scores, AI-generated summary, schedule adherence |
+| **Analytics** | Batch score distributions, completion rates, top performers, at-risk cohort |
+| **Schedule Management** | Create training schedules; assign assessments to time slots |
+| **Reports** | Generate and download PDF progress reports for individuals or the whole batch |
 
 ### Admin
-- `GET /api/v1/admin/users`
-- `POST /api/v1/admin/users`
-- `POST /api/v1/admin/bulk/assign-mentor`
-- `GET /api/v1/admin/stats`
-- `GET /api/v1/admin/freshers/details`
-- `GET /api/v1/admin/freshers/{fresher_id}/details`
-- `POST /api/v1/admin/seed-data`
-- `GET /api/v1/admin/warnings`
-- `GET /api/v1/admin/overall-report`
 
-### Certifications and Assignment History
-- `GET /api/v1/certifications/fresher/{fresher_id}`
-- `POST /api/v1/certifications/fresher/{fresher_id}`
-- `PUT /api/v1/certifications/{certification_id}`
-- `DELETE /api/v1/certifications/{certification_id}`
-- `GET /api/v1/certifications/assignment-history/fresher/{fresher_id}`
-- `GET /api/v1/certifications/assignment-history/submission/{submission_id}`
-- `POST /api/v1/certifications/assignment-history`
+Full platform control.
 
-### Reports
-- `POST /api/v1/reports/generate/{report_type}`
-- `POST /api/v1/reports/individual`
-- `POST /api/v1/reports/department`
-- `POST /api/v1/reports/cohort`
-- `GET /api/v1/reports`
-- `GET /api/v1/reports/{report_id}/download`
+| Section | What it does |
+|---|---|
+| **Dashboard** | Platform-wide stats: total users by role, assessment completion rates, system health |
+| **User Management** | Create accounts, activate/deactivate users across all roles |
+| **Curriculum Management** | Create learning modules, organise by department, assign to fresher batches |
+| **Assessment Configuration** | Build quiz question banks, set passing thresholds, configure AI evaluator parameters |
+| **Badge Management** | Define badge names, icons, score thresholds, and award criteria |
+| **Demo Data Reset** | Re-seed the database with fresh demo data without restarting the server |
 
-### Analytics
-- `GET /api/v1/analytics/dashboard`
-- `GET /api/v1/analytics/alerts`
-- `POST /api/v1/analytics/alerts/{alert_id}/acknowledge`
-- `GET /api/v1/analytics/cohort/{cohort_type}/{cohort_value}`
-- `GET /api/v1/analytics/trends`
-- `GET /api/v1/analytics/departments`
+---
 
-### Agents
-- `POST /api/v1/agents/generate-schedule`
-- `POST /api/v1/agents/grade`
-- `POST /api/v1/agents/predict-risk`
-- `POST /api/v1/agents/update-profile`
-- `GET /api/v1/agents/metrics`
-- `GET /api/v1/agents/{agent_name}/status`
+## AI Agent Details
 
-### Curriculum and Premium
-- `GET /api/v1/curricula`
-- `GET /api/v1/curricula/{curriculum_id}`
-- `GET /api/v1/curricula/fresher/{fresher_id}`
-- `GET /api/v1/badges`
-- `GET /api/v1/freshers/{fresher_id}/badges`
-- `POST /api/v1/freshers/{fresher_id}/badges/{badge_id}`
-- `GET /api/v1/assessments/{assessment_id}/schedules`
-- `POST /api/v1/assessments/{assessment_id}/schedule`
-- `GET /api/v1/freshers/{fresher_id}/schedules`
-- `GET /api/v1/freshers/{fresher_id}/analytics`
-- `GET /api/v1/analytics/cohort-comparison`
-- `POST /api/v1/analytics/update/{fresher_id}`
-- `GET /api/v1/submissions/{submission_id}/pdf`
-- `GET /api/v1/freshers/{fresher_id}/performance-report/pdf`
-- `POST /api/v1/submissions/{submission_id}/ai-feedback`
-- `GET /api/v1/freshers/{fresher_id}/ai-insights`
-- `GET /api/v1/quiz-evaluator/config`
-- `PUT /api/v1/quiz-evaluator/config`
-- `PUT /api/v1/quiz-evaluator/competency-thresholds`
-- `PUT /api/v1/quiz-evaluator/feedback-templates`
-- `PUT /api/v1/quiz-evaluator/llm-prompt`
-- `POST /api/v1/quiz-evaluator/presets/{preset_name}`
-- `GET /api/v1/quiz-evaluator/presets`
-- `POST /api/v1/quiz-evaluator/reset`
+All agents inherit from `BaseAgent` in `backend/app/agents/base.py` and interact with Ollama through `LLMClient`.
 
-## Frontend Route Map
-- `/` - landing page
-- `/login` - sign-in page
-- `/signup` - registration page
-- `/dashboard/fresher` - fresher home
-- `/dashboard/fresher/schedule` - weekly schedule
-- `/dashboard/fresher/assessments` - assessment list
-- `/dashboard/fresher/assessments/[id]/quiz` - quiz runner
-- `/dashboard/fresher/assessments/[id]/assignment` - assignment runner
-- `/dashboard/fresher/assessments/[id]/code` - coding assessment page
-- `/dashboard/fresher/assessments/[id]/results` - results page
-- `/dashboard/fresher/profile` - fresher profile
-- `/dashboard/fresher/learning/[id]` - learning item view
-- `/dashboard/manager` - manager dashboard
-- `/dashboard/manager/fresher/[id]` - fresher detail view for managers
-- `/dashboard/admin` - admin console
+### QuizEvaluatorAgent
 
-## Seeded Test Accounts
+**File:** `backend/app/agents/quiz_evaluator_agent.py`
 
-### Admin and manager
-- `admin@maverick.ai` / `admin123`
-- `manager@maverick.ai` / `password123`
+Evaluates multiple-choice quiz submissions. Sends the question bank and fresher's answers to the LLM using a corporate HR learning prompt. Returns:
 
-### Freshers
-- `alice@maverick.ai` / `password123`
-- `bob@maverick.ai` / `password123`
-- `emily@maverick.ai` / `password123`
-- `john@maverick.ai` / `password123`
+```json
+{
+  "overall_assessment": "Narrative summary of the attempt",
+  "competency_level": "Exceeds Expectations | Meets Expectations | Below Expectations",
+  "strengths": ["..."],
+  "development_areas": ["..."],
+  "recommended_actions": ["..."],
+  "hr_notes": "HR-facing commentary"
+}
+```
 
-## Backend Startup
-1. Open a terminal in `backend`
-2. Activate the Python 3.12 virtual environment
-3. Run `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
+The numeric score is computed separately as percentage of correct answers × 100.
 
-## Frontend Startup
-1. Open a terminal in `frontend`
-2. Run `npm run dev`
-3. Open `http://localhost:3000`
+### AssignmentEvaluatorAgent
 
-## Current Logic Summary
-- Admin access is role-based and routed through the shared login page.
-- The admin dashboard is the frontend route `/dashboard/admin`.
-- Assignment submissions are now preserved, graded, and written to assignment history.
-- The fresher dashboard history section uses completed assessment data, so assignment attempts now appear there after submission.
-- All app configuration is aligned to `http://localhost:8000/api/v1`.
+**File:** `backend/app/agents/assignment_evaluator_agent.py`
 
-## Notes
-- Docker Compose is listed in older docs, but local startup in this environment has been using manual backend and frontend processes.
-- The repository currently uses SQLite in local development.
-- This guide is the single source of truth for setup, routes, and workflow behavior.
+Evaluates free-text assignment submissions against a rubric. Returns:
+
+```json
+{
+  "score": 75,
+  "overall_assessment": "...",
+  "competency_rating": "Adequate | Proficient | Exemplary",
+  "strengths": ["..."],
+  "areas_for_improvement": ["..."],
+  "content_analysis": {
+    "depth_of_understanding": "...",
+    "clarity_of_communication": "...",
+    "professional_quality": "..."
+  },
+  "developmental_recommendations": ["..."],
+  "business_readiness_notes": "...",
+  "hr_recommendation": "..."
+}
+```
+
+### AssessmentAgent
+
+**File:** `backend/app/agents/assessment_agent.py`
+
+Orchestrates the full assessment lifecycle:
+1. Creates the submission record
+2. Routes to `QuizEvaluatorAgent` or `AssignmentEvaluatorAgent` based on assessment type
+3. Persists score and feedback
+4. Calls `ProfileAgent` to check badge eligibility
+5. Calls `AnalyticsAgent` to update running stats
+
+### ProfileAgent
+
+**File:** `backend/app/agents/profile_agent.py`
+
+Manages fresher profiles and the badge system. After every evaluated assessment:
+1. Recalculates the fresher's overall average score
+2. Queries all badge definitions for thresholds the fresher now meets
+3. Awards new badges and writes audit records to the database
+
+### OnboardingAgent
+
+**File:** `backend/app/agents/onboarding_agent.py`
+
+Generates personalised onboarding plans when a new fresher is registered:
+1. Reads the fresher's department
+2. Selects appropriate curricula
+3. Creates an initial weekly training schedule
+4. Generates an LLM-written welcome summary stored on the fresher's profile
+
+### AnalyticsAgent
+
+**File:** `backend/app/agents/analytics_agent.py`
+
+Aggregates performance data across all submissions:
+- Recalculates running average score
+- Updates quiz vs. assignment breakdown
+- Writes to the `PerformanceAnalytics` table used by manager and admin dashboards
+
+### ReportingAgent
+
+**File:** `backend/app/agents/reporting_agent.py`
+
+Generates structured report data consumed by two PDF generators:
+- `pdf_generator.py` (fpdf2) — individual fresher progress reports via `/api/v1/reports`
+- `pdf_generator_v2.py` (reportlab) — richer premium exports via the premium routes
+
+---
+
+## Ollama Integration
+
+**File:** `backend/app/core/llm_client.py`
+
+`LLMClient` wraps all Ollama HTTP calls. On startup it checks whether the Ollama server is reachable at `OLLAMA_BASE_URL`.
+
+**Default models:**
+
+| Purpose | Model |
+|---|---|
+| General evaluation and feedback | `neural-chat` |
+| Code assessment | `mistral` |
+
+**Switching models:**
+
+Set the environment variable before running the startup script:
+
+```bash
+# Linux/Mac
+OLLAMA_MODEL=llama3 ./start.sh
+
+# Windows
+$env:OLLAMA_MODEL = "llama3"; .\start.ps1
+```
+
+Or edit `backend/.env`:
+
+```
+OLLAMA_MODEL=neural-chat
+OLLAMA_CODE_MODEL=mistral
+```
+
+**Mock fallback:**
+
+When Ollama is offline or not installed, `LLMClient._mock_response()` is called instead. It inspects the prompt and returns a structurally valid JSON object matching whichever agent schema was requested. Every platform feature — quiz submission, assignment evaluation, badge award, report generation — works in mock mode. Scores use deterministic logic; feedback uses templated responses.
+
+---
+
+## API Reference
+
+Interactive Swagger documentation is served at:
+
+```
+http://localhost:8000/docs
+```
+
+ReDoc is at:
+
+```
+http://localhost:8000/redoc
+```
+
+### Authentication
+
+```
+POST /api/v1/auth/login
+POST /api/v1/auth/register
+GET  /api/v1/auth/me
+```
+
+Login response includes:
+
+```json
+{
+  "access_token": "<jwt>",
+  "token_type": "bearer",
+  "expires_in": 86400,
+  "user": {
+    "id": 1,
+    "email": "alice@maverick.ai",
+    "first_name": "Alice",
+    "last_name": "Smith",
+    "role": "fresher",
+    "department": "Engineering",
+    "is_active": true,
+    "fresher_id": 1
+  }
+}
+```
+
+All protected endpoints require the header:
+
+```
+Authorization: Bearer <access_token>
+```
+
+Report PDF downloads additionally accept `?token=<jwt>` as a query parameter so browsers can trigger a direct download without a custom header.
+
+### Fresher Routes
+
+```
+GET  /api/v1/freshers/me                         Current fresher profile
+GET  /api/v1/freshers/user/{user_id}             Profile by user ID
+GET  /api/v1/freshers                            All freshers (manager/admin)
+GET  /api/v1/freshers/{fresher_id}               Fresher detail (manager/admin)
+GET  /api/v1/freshers/{fresher_id}/dashboard     Dashboard data
+GET  /api/v1/freshers/{fresher_id}/analytics     Performance analytics
+```
+
+### Assessment Routes
+
+```
+GET  /api/v1/assessments                         List all assessments
+GET  /api/v1/assessments/{id}                    Assessment detail
+POST /api/v1/assessments/{id}/start              Begin attempt
+POST /api/v1/assessments/{id}/submit             Submit answers → triggers AI evaluation
+GET  /api/v1/assessments/{id}/results            Latest evaluation results
+GET  /api/v1/assessments/{id}/history            Submission history
+```
+
+### Schedule Routes
+
+```
+GET  /api/v1/schedules/today                     Today's schedule items
+GET  /api/v1/schedules/week                      This week's schedule
+POST /api/v1/schedules/{id}/start                Mark item as started
+POST /api/v1/schedules/{id}/complete             Mark item as completed
+```
+
+### Analytics Routes
+
+```
+GET  /api/v1/analytics/manager/dashboard         Manager team summary
+GET  /api/v1/analytics/manager/alerts            At-risk fresher alerts
+GET  /api/v1/analytics/manager/cohort            Cohort comparison data
+GET  /api/v1/analytics/admin/dashboard           Platform-wide stats
+```
+
+### Report Routes
+
+```
+GET  /api/v1/reports/{fresher_id}                Generate report (JSON)
+GET  /api/v1/reports/{fresher_id}/download       Download PDF (auth via header or ?token=)
+```
+
+### Admin Routes
+
+```
+GET  /api/v1/admin/stats                         Platform statistics
+POST /api/v1/admin/users                         Create user
+PUT  /api/v1/admin/users/{id}                    Update user
+POST /api/v1/admin/seed                          Re-seed demo data
+```
+
+### Premium Routes
+
+```
+GET  /api/v1/badges                              List available badges
+GET  /api/v1/badges/fresher/{id}                 Fresher's earned badges
+GET  /api/v1/analytics/premium/{fresher_id}      Premium analytics
+GET  /api/v1/reports/pdf/{fresher_id}            Premium PDF export
+GET  /api/v1/schedules/premium/{fresher_id}      Enhanced schedule view
+```
+
+### Health
+
+```
+GET  /health                                     Backend liveness check
+GET  /api/v1/health/db                           Database connectivity check
+```
+
+---
+
+## Project Structure
+
+```
+HEXAWARE-HACKATHON-/
+│
+├── start.ps1                      Windows PowerShell startup script
+├── start.sh                       Linux / macOS / Git Bash startup script
+├── docker-compose.yml             Docker Compose (optional alternative)
+├── .gitignore
+├── README.md
+│
+├── logs/                          Created at runtime by start scripts
+│
+├── backend/
+│   ├── .env.example               Template for environment variables
+│   ├── requirements.txt           Python dependencies
+│   ├── Dockerfile
+│   │
+│   └── app/
+│       ├── main.py                App factory, router registration, startup hook
+│       ├── config.py              Settings loaded from .env via pydantic-settings
+│       ├── database.py            SQLAlchemy engine, session factory, auto-migration
+│       ├── seed.py                Initial data seeding (users, curricula, badges)
+│       │
+│       ├── agents/                AI agent layer
+│       │   ├── base.py            BaseAgent with shared LLMClient access
+│       │   ├── quiz_evaluator_agent.py
+│       │   ├── assignment_evaluator_agent.py
+│       │   ├── assessment_agent.py
+│       │   ├── profile_agent.py
+│       │   ├── onboarding_agent.py
+│       │   ├── analytics_agent.py
+│       │   └── reporting_agent.py
+│       │
+│       ├── api/
+│       │   ├── deps.py            Shared dependencies: get_current_user, get_db
+│       │   └── routes/
+│       │       ├── auth.py        Login, register, /me
+│       │       ├── freshers.py    Fresher profiles, dashboard
+│       │       ├── assessments.py Quiz / assignment lifecycle
+│       │       ├── schedules.py   Training schedule management
+│       │       ├── analytics.py   Manager and admin analytics
+│       │       ├── agents.py      Direct agent invocation endpoints
+│       │       ├── workflows.py   Automated onboarding workflows
+│       │       ├── reports.py     Report generation and PDF download
+│       │       ├── curricula.py   Curriculum CRUD
+│       │       ├── admin.py       Admin-only operations
+│       │       ├── premium.py     Badge, premium analytics, premium PDF
+│       │       ├── certifications.py  Certification records
+│       │       └── quiz_config.py     Quiz evaluator configuration (admin)
+│       │
+│       ├── core/
+│       │   ├── llm_client.py      Ollama HTTP wrapper + mock fallback
+│       │   └── security.py        JWT encode/decode, password hashing
+│       │
+│       ├── models/                SQLAlchemy ORM models
+│       │   ├── user.py            User (all roles)
+│       │   ├── fresher.py         Fresher profile, skills, achievements
+│       │   ├── assessment.py      Assessment, Submission
+│       │   ├── curriculum.py      Curriculum, Module
+│       │   ├── schedule.py        Schedule, ScheduleItem
+│       │   ├── analytics.py       PerformanceAnalytics, Alert
+│       │   ├── badge.py           Badge, FresherBadge
+│       │   ├── certification.py   Certification, FresherCertification
+│       │   ├── report.py          Report records
+│       │   └── schedule_assessment.py  Assessment-to-schedule mapping
+│       │
+│       ├── schemas/               Pydantic request/response models
+│       │   ├── auth.py
+│       │   └── __init__.py
+│       │
+│       └── utils/
+│           ├── pdf_generator.py       fpdf2 — standard progress reports
+│           ├── pdf_generator_v2.py    reportlab — premium exports
+│           └── feedback_generator.py  Deterministic fallback feedback
+│
+└── frontend/
+    ├── package.json
+    ├── next.config.js
+    ├── tailwind.config.js
+    ├── postcss.config.js
+    ├── Dockerfile
+    │
+    └── src/
+        ├── app/
+        │   ├── layout.tsx             Root layout, AuthProvider
+        │   ├── globals.css
+        │   ├── page.tsx               Landing → redirect to login
+        │   ├── login/page.tsx         Login form
+        │   ├── signup/page.tsx        Registration form
+        │   └── dashboard/
+        │       ├── fresher/
+        │       │   ├── layout.tsx                  Sidebar + auth guard
+        │       │   ├── page.tsx                    Overview / home
+        │       │   ├── learning/[id]/page.tsx       Curriculum reader
+        │       │   ├── schedule/page.tsx            Training calendar
+        │       │   ├── profile/page.tsx             Badges and stats
+        │       │   └── assessments/
+        │       │       ├── page.tsx                Assessment list
+        │       │       └── [id]/
+        │       │           ├── quiz/page.tsx        MCQ quiz interface
+        │       │           ├── assignment/page.tsx  Free-text submission
+        │       │           ├── code/page.tsx        Code challenge
+        │       │           └── results/page.tsx     AI evaluation results
+        │       ├── manager/
+        │       │   ├── layout.tsx                  Sidebar + auth guard
+        │       │   ├── page.tsx                    Team dashboard
+        │       │   └── fresher/[id]/page.tsx        Individual fresher detail
+        │       └── admin/
+        │           └── page.tsx                    Admin control panel
+        │
+        ├── components/ui/
+        │   ├── badge.tsx
+        │   ├── button.tsx
+        │   ├── card.tsx
+        │   └── progress.tsx
+        │
+        ├── hooks/
+        │   └── useApi.ts              Generic data-fetching hook with auth header
+        │
+        └── lib/
+            ├── api-service.ts         All backend API calls, typed responses
+            └── auth-context.tsx       JWT auth state provider (decode + store)
+```
+
+---
+
+## Environment Variables
+
+### Backend — `backend/.env`
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | `sqlite:///./maverickai.db` | SQLAlchemy database URL |
+| `SECRET_KEY` | *(change in production)* | JWT signing key |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `1440` | Token lifetime (24 hours) |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| `OLLAMA_MODEL` | `neural-chat` | Primary LLM for evaluations |
+| `OLLAMA_CODE_MODEL` | `mistral` | Model for code assessments |
+
+### Frontend — `frontend/.env.local`
+
+| Variable | Default | Description |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` | Backend API base URL |
+
+---
+
+## Application URLs
+
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
+| ReDoc | http://localhost:8000/redoc |
+| Backend health | http://localhost:8000/health |
+| DB health | http://localhost:8000/api/v1/health/db |
+| Ollama | http://localhost:11434 |
+
+---
+
+## Known Limitations
+
+- **CORS** is currently set to `allow_origins=["*"]` for local development. Restrict this to your frontend domain before deploying.
+- **Secret key** defaults are placeholders. Generate a strong random secret for any non-local environment.
+- **Profile page edits** (extended fields like bio and skills) are saved to local React state only and are not persisted to the backend — the backend API for these extended fields does not exist yet.
+- **Manager action modals** (Warn / Appreciate / Fired) are UI-only and do not call any backend endpoint.
+- **Skill stats** on the profile page display demo data from the seed, not computed from real assessment history.
+- **Synchronous LLM calls** — evaluations run synchronously in the request. Under heavier concurrent load, consider moving to a background task queue (Celery, ARQ).
+- The `(trapped) error reading bcrypt version` warning on backend startup is harmless — it is a known passlib cosmetic issue and does not affect password hashing.

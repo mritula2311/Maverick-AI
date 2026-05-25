@@ -186,7 +186,7 @@ class ProfileAgent(BaseAgent):
                         earned_at=datetime.utcnow()
                     )
                     db.add(fresher_badge)
-                    print(f"[ProfileAgent] 🏆 Awarded badge '{badge.name}' to fresher {fresher.id} (score: {score_achieved:.1f})")
+                    print(f"[ProfileAgent] [BADGE] Awarded badge '{badge.name}' to fresher {fresher.id} (score: {score_achieved:.1f})")
 
     def generate_fresher_summary(self, fresher: Fresher, skills: list):
         """Use LLM to generate a personalized skill portrait."""

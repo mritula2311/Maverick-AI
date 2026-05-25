@@ -56,7 +56,7 @@ class QuizEvaluatorAgent(BaseAgent):
     def update_config(self, new_config: Dict[str, Any]) -> None:
         """Update agent configuration parameters"""
         self.config.update(new_config)
-        print(f"[QuizEvaluatorAgent] ✓ Configuration updated: {list(new_config.keys())}")
+        print(f"[QuizEvaluatorAgent] [OK] Configuration updated: {list(new_config.keys())}")
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration"""
@@ -190,7 +190,7 @@ class QuizEvaluatorAgent(BaseAgent):
         submission.graded_at = datetime.now(timezone.utc)
         db.commit()
 
-        print(f"[QuizEvaluatorAgent] ✓ Evaluated quiz: {score:.1f}% ({pass_status})")
+        print(f"[QuizEvaluatorAgent] [OK] Evaluated quiz: {score:.1f}% ({pass_status})")
 
         return {
             "score": round(score, 2),
@@ -249,14 +249,14 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown."""
             if all(field in feedback for field in required_fields):
                 return feedback
             else:
-                print(f"[QuizEvaluatorAgent] ⚠ LLM response missing required fields")
+                print(f"[QuizEvaluatorAgent] [WARN] LLM response missing required fields")
                 if self.config.get("fallback_on_llm_error", True):
                     return self._get_fallback_feedback(score, incorrect_count, total_questions)
                 else:
                     raise ValueError("LLM feedback validation failed")
                 
         except Exception as e:
-            print(f"[QuizEvaluatorAgent] ✗ LLM feedback error: {e}")
+            print(f"[QuizEvaluatorAgent] [ERR] LLM feedback error: {e}")
             if self.config.get("fallback_on_llm_error", True):
                 return self._get_fallback_feedback(score, incorrect_count, total_questions)
             else:
@@ -288,7 +288,7 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown."""
             parsed = json.loads(response_text)
             return parsed
         except Exception as e:
-            print(f"[QuizEvaluatorAgent] ✗ JSON parse error: {e}")
+            print(f"[QuizEvaluatorAgent] [ERR] JSON parse error: {e}")
             return {}
 
     def _get_fallback_feedback(self, score, incorrect_count, total_questions):
@@ -329,19 +329,19 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown."""
         if "feedback_templates" not in self.config:
             self.config["feedback_templates"] = {}
         self.config["feedback_templates"].update(templates)
-        print(f"[QuizEvaluatorAgent] ✓ Updated feedback templates: {list(templates.keys())}")
+        print(f"[QuizEvaluatorAgent] [OK] Updated feedback templates: {list(templates.keys())}")
     
     def update_competency_thresholds(self, thresholds: Dict[str, float]) -> None:
         """Update scoring thresholds for competency levels"""
         if "competency_thresholds" not in self.config:
             self.config["competency_thresholds"] = {}
         self.config["competency_thresholds"].update(thresholds)
-        print(f"[QuizEvaluatorAgent] ✓ Updated competency thresholds: {thresholds}")
+        print(f"[QuizEvaluatorAgent] [OK] Updated competency thresholds: {thresholds}")
     
     def update_llm_prompt_template(self, prompt_template: str) -> None:
         """Update the LLM prompt template for generating feedback"""
         self.config["custom_llm_prompt"] = prompt_template
-        print(f"[QuizEvaluatorAgent] ✓ Updated LLM prompt template")
+        print(f"[QuizEvaluatorAgent] [OK] Updated LLM prompt template")
     
     def get_evaluation_stats(self) -> Dict[str, Any]:
         """Get current evaluation statistics and configuration"""

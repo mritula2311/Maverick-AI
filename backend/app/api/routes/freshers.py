@@ -20,7 +20,11 @@ def get_my_dashboard(
     fresher = db.query(Fresher).filter(Fresher.user_id == current_user.id).first()
     if not fresher:
         raise HTTPException(status_code=404, detail="Fresher profile not found")
-    return _build_dashboard(db, fresher, current_user)
+    try:
+        return _build_dashboard(db, fresher, current_user)
+    except Exception as e:
+        print(f"[ERROR] Dashboard build failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Dashboard error: {str(e)}")
 
 
 @router.get("/user/{user_id}")

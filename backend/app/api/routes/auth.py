@@ -8,6 +8,15 @@ from app.schemas.auth import LoginRequest, RegisterRequest
 router = APIRouter(tags=["Authentication"])
 
 
+def require_role(*roles):
+    """Dependency to enforce role-based access control"""
+    async def check_role(current_user: User = Depends(__import__("app.api.deps", fromlist=["get_current_user"]).get_current_user)):
+        if current_user.role not in roles:
+            raise HTTPException(status_code=403, detail=f"Access denied. Required role: {', '.join(roles)}")
+        return current_user
+    return check_role
+
+
 @router.post("/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
@@ -50,12 +59,27 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     }
 
 
+@router.post("/refresh")
+def refresh_token(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(__import__("app.api.deps", fromlist=["get_current_user"]).get_current_user),
+):
+    """Refresh access token"""
+    token = create_access_token(data={"sub": str(current_user.id)})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": 1440,
+    }
+
+
 @router.get("/me")
 def get_me(
     db: Session = Depends(get_db),
     current_user: User = Depends(__import__("app.api.deps", fromlist=["get_current_user"]).get_current_user),
 ):
     return _user_dict(current_user, db)
+
 
 
 def _user_dict(user: User, db: Session) -> dict:

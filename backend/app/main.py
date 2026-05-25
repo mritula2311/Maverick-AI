@@ -22,6 +22,31 @@ app.add_middleware(
     expose_headers=["Content-Disposition", "Content-Type", "Content-Length"],
 )
 
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "service": "MaverickAI API", "version": "1.0.0"}
+
+
+@app.get("/api/v1/health/db")
+async def health_db():
+    """Database health check endpoint"""
+    try:
+        db = SessionLocal()
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+        db.close()
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+
+
+@app.get("/")
+async def root():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs")
+
+
 # Mount routers
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(freshers.router, prefix="/api/v1/freshers")
@@ -36,17 +61,6 @@ app.include_router(admin.router, prefix="/api/v1/admin")
 app.include_router(premium.router)  # Premium routes use their own /api/v1 prefix
 app.include_router(certifications.router, prefix="/api/v1/certifications")
 app.include_router(quiz_config.router, prefix="/api/v1/quiz-evaluator")
-
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy", "service": "MaverickAI API", "version": "1.0.0"}
-
-
-@app.get("/")
-async def root():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/docs")
 
 
 @app.on_event("startup")
